@@ -87,16 +87,6 @@ vector<vector<double>> Vehicle::decide_next_state(const map<int, Vehicle> &round
     cout << "best state: " << best_state << " and best cost: " << min_cost << endl;
     this->state = best_state;
 
-/*    cout << "moving strategy: " << best_state <<endl;
-
-    //generate final trajectory from best trajectory parameters.
-    vector<double> s_para = best_traj[0];
-    vector<double> d_para = best_traj[1];
-    for (int i = 0; i < s_para.size(); i++) {
-        cout << "s_para" << s_para[i] << endl;
-        cout << "d_para" << d_para[i] << endl;
-    }
-*/
     return best_traj;
 }
 
@@ -167,15 +157,14 @@ vector<vector<vector<double>>> Vehicle::keep_lane_trajectory(const map<int, Vehi
     //else, speed up.
     if (get_vehicle_ahead(round_vehicles, this->ref_lane, ahead) &&
         (ahead.ref_s - this->ref_s) < 30) {
-            double extra_dec = 0.2* max(0.0, this->ref_vs -ahead.ref_vs);
-            goal_vs = max(0.0, goal_vs - 0.2 * ( 1+ extra_dec));
-    } else if (goal_vs < TARGET_SPEED - 0.3)
-        goal_vs += 0.2;
-
-/*    if (goal_vs < TARGET_SPEED)
-        goal_vs += 1;*/
+            //double extra_dec = 0.2* max(0.0, this->ref_vs -goal_vs);
+            double extra_dec = 0;
+            goal_vs = max(0.0, goal_vs - TARGET_DEC * (1+ extra_dec));
+    } else if (goal_vs < TARGET_SPEED - 0.2)
+        goal_vs += TARGET_ACC;
 
     traj_set = trajectory_points(goals_sets, goal_vs);
+    //cout << "state: " << state << ", goal_vs: " << goal_vs << endl;
 
     return traj_set;
 }
@@ -194,50 +183,43 @@ vector<vector<vector<double>>> Vehicle::prep_lane_change_trajectory(string state
     double goal_vs = ref_vs;
     Vehicle ahead, ahead_next_lane, behind_next_lane;
 
-    if (get_vehicle_ahead(round_vehicles, heading_lane(), ahead_next_lane) &&
-        (ahead_next_lane.ref_s - this->ref_s) < 40) {
+    if (get_vehicle_ahead(round_vehicles, this->ref_lane, ahead) &&
+        (ahead.ref_s - this->ref_s) < 30) {
+        cout << "ahead car in this lane!" << endl;
+        double extra_dec = 0;
+        goal_vs -= TARGET_DEC;
+        //goal_vs = max(0.0, goal_vs - TARGET_DEC * (1 + extra_dec));
+        cout << "slow down: " << goal_vs << endl;
+
+    }else if (get_vehicle_ahead(round_vehicles, heading_lane(), ahead_next_lane) &&
+             (ahead_next_lane.ref_s - this->ref_s) < 10) {
         //if in the target lane, there is a car ahead, try to speed up or slow down wait it go away;
 
         cout << "next line have ahead vehicle" << endl;
-        // if in both lane there are car ahead and they were close,
-        //then just stay in the current lane and slow down.
-        if (get_vehicle_ahead(round_vehicles, this->ref_lane, ahead) &&
-                              (ahead.ref_s - this->ref_s) < 40) {
-            cout << "too close" << endl;
-            double extra_dec = 0.1 * max(0.0, this->ref_vs -ahead.ref_vs);
-            goal_vs = max(0.0, goal_vs -  0.2 * (1 + extra_dec));
+        // if ahead car is fast, ego car would wait
+        // else speed up to pass the next lane ahead car.
+        if (ahead_next_lane.ref_vs < this->ref_vs) {
+            cout << "speed up" << endl;
+            goal_vs = min(goal_vs + 2 *TARGET_ACC, TARGET_SPEED);
         }
-        else  //speed up to pass the next lane ahead car.
-            cout << "speed up" << endl;
-            goal_vs = min(goal_vs + 0.1, TARGET_SPEED);
 
-    } else if (get_vehicle_behind(round_vehicles, heading_lane(), behind_next_lane)) {
-        cout << "next line have behind vehicle" << endl;
-        cout << get_vehicle_ahead(round_vehicles, this->ref_lane, ahead) << endl;
+    } else if (get_vehicle_behind(round_vehicles, heading_lane(), behind_next_lane) &&
+               (this->ref_s - behind_next_lane.ref_s) < 20) {
+        cout << "next line have near behind vehicle" << endl;
 
-        //1.if in the target lane, there is a car behind and close, stay in current lane and do nothing.
-        //2.if in the target lane, there is a car behind and not so close, speed up
-        if (get_vehicle_ahead(round_vehicles, this->ref_lane, ahead) &&
-                              (ahead.ref_s - this->ref_s) < 40) {
-            cout << "too close" << endl;
-            double extra_dec = 0.1 * max(0.0, this->ref_vs -ahead.ref_vs);
-            goal_vs = max(0.0, goal_vs -  0.2 * (1 + extra_dec));
-        } else if ((this->ref_s - behind_next_lane.ref_s) >= 20) {  //case2
-            cout << "speed up" << endl;
-            goal_vs = min(goal_vs + 1, TARGET_SPEED);
-        } else
-            goal_vs = max(0.0, goal_vs -  0.1);
+        //1.if in the target lane, there is a car behind and close, stay in current lane slow down or do nothing wait it pass.
+        //2.if in the target lane, there is a car behind and not so close, keep target speed
+        // case 1 here
+        goal_vs = goal_vs > behind_next_lane.ref_vs ? (goal_vs - 1) : goal_vs; //avoid slow down too much
+        cout << "slow down: " << goal_vs << endl;
 
-    } else if (get_vehicle_ahead(round_vehicles, this->ref_lane, ahead) &&
-              (ahead.ref_s - this->ref_s) < 40) {
-        double extra_dec = 0.1 * max(0.0, this->ref_vs -ahead.ref_vs);
-        goal_vs = max(0.0, goal_vs - 0.2 * (1 + extra_dec));
-
-    } else if (goal_vs < TARGET_SPEED - 0.3) {
-        goal_vs += 0.2;
+    } else if (goal_vs < TARGET_SPEED - 0.2) {
+        goal_vs = min(goal_vs + TARGET_ACC, TARGET_SPEED);
+        cout << "speed up: " << goal_vs << endl;
     }
 
     traj_set = trajectory_points(goals, goal_vs);
+    cout << "state: " << state << ", goal_vs: " << goal_vs << endl;
 
     return traj_set;
 }
@@ -262,8 +244,9 @@ vector<vector<vector<double>>> Vehicle::lane_change_trajectory(string state, con
     vector<vector<vector<double>>> goals = get_goal_positions(round_vehicles, this->heading_lane());
 
     double goal_vs = ref_vs;
-    goal_vs = min(goal_vs + 0.2, TARGET_SPEED);   //while change lane, speed up
+    goal_vs = min(goal_vs + 0.15, TARGET_SPEED);   //while change lane, speed up
     traj_set = trajectory_points(goals, goal_vs);
+    //cout << "state: " << state << ", goal_vs: " << goal_vs << endl;
 
     return traj_set;
 }
@@ -347,16 +330,16 @@ vector<vector<vector<double>>> Vehicle::get_goal_positions(const map<int, Vehicl
     //perturb goals
     default_random_engine gen;
     normal_distribution<double> distrib(0, 1);
-    vector<double> goal_s = {30, 60, 90};
+    vector<double> goal_s = {40, 70, 100};
 
     for (int i = 0; i < N_SAMPLES; i++) {
         //perturb goals
 /*        goal_s[0] = this->s + 30 + distrib(gen);
         goal_s[1] = this->s + 60 + distrib(gen);
         goal_s[2] = this->s + 90 + distrib(gen); */
-        goal_s[0] = this->s + 30 + 30*abs(lane-ref_lane); //if change lane, we want slow down vd
-        goal_s[1] = this->s + 60 + 20*abs(lane-ref_lane);
-        goal_s[2] = this->s + 90 + 10*abs(lane-ref_lane); 
+        goal_s[0] = this->s + 40 + 10*abs(lane-ref_lane); //if change lane, we want slow down vd
+        goal_s[1] = this->s + 70 + 10*abs(lane-ref_lane);
+        goal_s[2] = this->s + 100 + 10*abs(lane-ref_lane); 
         
         vector<double> p3= getXY(goal_s[0], (4 *lane + 2), map_waypoints_s, map_waypoints_x, map_waypoints_y);
         vector<double> p4= getXY(goal_s[1], (4 *lane + 2), map_waypoints_s, map_waypoints_x, map_waypoints_y);
@@ -392,7 +375,7 @@ double Vehicle::target_lane_speed(const map<int, Vehicle> & round_vehicles,
     }
     else
     //max_lane_speed < min_lane_speed means the behind car maybe want a lane change, maybe continue waitting
-        return TARGET_SPEED/2;
+        return min(TARGET_SPEED , max_lane_speed);
 }
 
 vector<double> Vehicle::_lane_speed_section(const map<int, Vehicle> & round_vehicles,
@@ -400,10 +383,10 @@ vector<double> Vehicle::_lane_speed_section(const map<int, Vehicle> & round_vehi
     Vehicle ahead, behind;
     double max_lane_speed = -1.0;
     double min_lane_speed = -1.0;
-    if (this->get_vehicle_ahead(round_vehicles, lane, ahead)) {
+    if (this->get_vehicle_ahead(round_vehicles, lane, ahead) && (ahead.ref_s - this->ref_s) < 80) {//ignore far away cars
         max_lane_speed = ahead.ref_vs;
     }
-    if (this->get_vehicle_behind(round_vehicles, lane, behind)) {
+    if (this->get_vehicle_behind(round_vehicles, lane, behind) && ( this->ref_s - behind.ref_s) < 50) {//ignore far away cars
         min_lane_speed = behind.ref_vs;
     }
     vector<double> speed_section = {min_lane_speed, max_lane_speed};
@@ -431,7 +414,7 @@ bool Vehicle::get_vehicle_behind(const map<int, Vehicle> &round_vehicles,
     Vehicle temp_vehicle;
     for (auto it = round_vehicles.begin(); it != round_vehicles.end(); ++it) {
         temp_vehicle = it->second;
-        if (temp_vehicle.ref_lane == this->ref_lane && temp_vehicle.ref_s < this->ref_s) {
+        if (temp_vehicle.ref_lane == this->ref_lane && temp_vehicle.ref_s + 1 < this->ref_s) {
             max_s = temp_vehicle.s;
             rVehicle = temp_vehicle;
             found_vehicle = true;
@@ -451,7 +434,7 @@ bool Vehicle::get_vehicle_ahead(const map<int, Vehicle> & round_vehicles,
     Vehicle temp_vehicle;
     for (auto it = round_vehicles.begin(); it != round_vehicles.end(); ++it) {
         temp_vehicle = it->second;
-        if (temp_vehicle.ref_lane == this->ref_lane && temp_vehicle.ref_s > this->ref_s) {
+        if (temp_vehicle.ref_lane == this->ref_lane && temp_vehicle.ref_s + 1 > this->ref_s) {
             min_s = temp_vehicle.s;
             rVehicle = temp_vehicle;
             found_vehicle = true;

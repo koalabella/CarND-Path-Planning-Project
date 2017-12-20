@@ -115,7 +115,7 @@ int main() {
           	// Sensor Fusion Data, a list of all other cars on the same side of the road.
           	auto sensor_fusion = j[1]["sensor_fusion"];
 
-            //cout << "current status: " << car_s << "," << car_d << "," << car_x << "," << car_y << "," << car_speed << endl;
+            cout << "current status: " << car_s << "," << car_d << "," << car_x << "," << car_y << "," << car_speed << endl;
 
           	json msgJson;
 

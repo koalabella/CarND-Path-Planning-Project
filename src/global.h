@@ -22,6 +22,8 @@ const double TRAJECTORY_STEP = 0.5;
 
 //infomation about destination and preffered speed
 const double TARGET_SPEED = 49.5/2.24;
+const double TARGET_ACC = 0.2;
+const double TARGET_DEC = 0.15;
 const int GOAL_LANE = 2;
 const double GOAL_S = 6945.554;
 

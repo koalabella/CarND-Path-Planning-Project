@@ -49,7 +49,7 @@ double inefficiency_cost(const Vehicle &vehicle,
 
     double v_final_lane = distance(last_x, last_y, pre_last_x, pre_last_y)/TIME_INTERVAL; //velocity at the last point in this cycle
 
-    double cost = fabs(2.0*TARGET_SPEED - v_intended_lane - v_final_lane)/TARGET_SPEED;
+    double cost = fabs(3.0*TARGET_SPEED - v_intended_lane - 2.0*v_final_lane)/TARGET_SPEED; //current state have more weight
 
     return logistic(cost);
 }
@@ -65,12 +65,19 @@ double full_lane_cost(const Vehicle &vehicle,
                    const map<int, Vehicle> &round_vehicles,
                    const vector<vector<double>> &traj) {
     double distance = 0;
+    double closest = 500;
+    double closest_ref_s;
     for (auto it = round_vehicles.begin(); it != round_vehicles.end(); ++it) {
         Vehicle temp_vehicle = it->second;
         if (temp_vehicle.ref_lane == vehicle.heading_lane() && temp_vehicle.ref_s > vehicle.ref_s) {
             distance += 20.0/(temp_vehicle.ref_s - vehicle.ref_s);
+            if (temp_vehicle.ref_s - vehicle.ref_s < closest) {
+                closest = temp_vehicle.ref_s - vehicle.ref_s;
+                closest_ref_s = temp_vehicle.ref_s;
+            }
         }
     }
+    distance += 20.0/(closest_ref_s - vehicle.ref_s);//closest car have more weight
     return logistic(distance);
 }
 
@@ -79,6 +86,6 @@ double change_lane_cost(const Vehicle &vehicle,
                         const vector<vector<double>> &traj) {    //punish lane change with little advantage
     double cost = 0;
     if (vehicle.state == "LCR" || vehicle.state == "LCL")
-        cost = 0.1;
+        cost = 0.05;
     return cost;
 }
